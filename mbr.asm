@@ -1,4 +1,4 @@
-SectorCount equ 01h
+SectorCount equ 05h
 LBA equ 02h
 LoaderAddr equ 0900h;Address for loading kernel.
 
