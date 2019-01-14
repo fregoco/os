@@ -8,15 +8,12 @@ jmp REAL_CODE
 LABEL_GDT: Descriptor 0, 0, 0
 LABEL_CODE32: Descriptor 0, CODE32_LEN - 1, DA_CR|DA_32
 LABEIL_DESC_PAGE: Descriptor 0, 0fffffh, DA_DRW|DA_LIMIT_4K;A descriptor holds all the memory.
-;LABEIL_DESC_PAGE1: Descriptor 0, 0ffffffh - 1, DA_DRW
 LABEL_DESC_KERNEL: Descriptor 0, 0xfffff, DA_CR|DA_LIMIT_4K|DA_32;A descriptor of 3~4G.
 LABEL_DESC_DATA: Descriptor 0, 0xfffff, DA_DRW
 LABEL_DESC_STACK: Descriptor 0, StackTop - 1, DA_DRW
 LABEL_VEDIO: Descriptor 0B8000h, 0ffffh, DA_DRW
 
 GDT_LEN equ $ - LABEL_GDT
-GDTPtr dw GDT_LEN - 1
-dd 0
 
 ;Selctor
 SelectorCode32 equ LABEL_CODE32 - LABEL_GDT
@@ -34,7 +31,9 @@ LABEL_DATA:
 	VirtualModStr: db "Paging complete.", 0
 	VirtualModStrOffset equ VirtualModStr - LABEL_DATA
 	VirtualModStrLen equ $ - VirtualModStr
-	KernelEntry : dd 0
+	GDTPtr: dw GDT_LEN - 1
+	dd 0
+	GDTPtrOffset equ GDTPtr - LABEL_DATA
 DATA_LEN equ $ - LABEL_DATA
 
 [SECTION .stack]
@@ -140,6 +139,20 @@ CODE32:
 	mov ebx, VirtualModStrOffset
 	mov edx, ((80*12) + 40)*2
 	call DispStr
+
+	;Change the base address of vedio descriptor to virtual space of kernel.
+	mov eax, [GDTPtrOffset+2]
+	;Only chang the four highest bits of base address of vedio descriptor.
+	or dword [eax+42+4], 0xc0000000
+
+	;Move top of stack to kernel virtual space.
+	add esp, 0xc0000000
+
+	;Move GDTPtr to kernel virtual space.
+	add eax, 0xc0000000
+	mov dword [GDTPtrOffset+2], eax
+
+	lgdt [GDTPtrOffset]
 	
 	;Load loader.bin
 	mov cx, 200;Sector number.Remember to modify it when kernel becomes bigger.
@@ -347,7 +360,6 @@ ParseKernel:
 	KernelOffset equ 0x1500
 	;Get and save kernel entry.
 	mov eax, [Kernel_Buff_Addr+0x18]
-	mov [KernelEntry], eax
 	;Get the offset of first program header.
 	mov eax, [Kernel_Buff_Addr+0x1c]
 	;The address of first program header.
