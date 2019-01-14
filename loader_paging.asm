@@ -13,8 +13,6 @@ LABEL_DESC_DATA: Descriptor 0, DATA_LEN - 1, DA_DR
 LABEL_VEDIO: Descriptor 0B8000h, 0ffffh, DA_DRW
 
 GDT_LEN equ $ - LABEL_GDT
-GDTPtr dw GDT_LEN - 1
-dd 0
 
 ;Selctor
 SelectorCode32 equ LABEL_CODE32 - LABEL_GDT
@@ -30,6 +28,8 @@ LABEL_DATA:
 	VirtualModStr: db "Paging complete.", 0
 	VirtualModStrOffset equ VirtualModStr - LABEL_DATA
 	VirtualModStrLen equ $ - VirtualModStr
+	GDTPtr: dw GDT_LEN - 1
+	dd 0
 DATA_LEN equ $ - LABEL_DATA
 
 [SECTION .code16]
@@ -118,6 +118,38 @@ CODE32:
 	mov ebx, VirtualModStrOffset
 	mov edx, ((80*12) + 40)*2
 	call DispStr
+
+	;Change the base address of vedio descriptor to virtual space of kernel.
+	mov ax, SelectorPage
+	mov ds, ax
+	mov eax ,0x900;Base address of loader.
+	add eax, LABEL_VEDIO;Address of vedio descriptor.
+	;Only chang the four highest bits of base address of vedio descriptor.
+	mov ebx, [eax+16]
+	or ebx, 0xc000
+	mov [eax+16], ebx
+
+	;Move top of stack to virtual space.
+	add esp, 0xc0000000
+
+	;Move GDTPtr to virtual space.
+	mov eax, [GDTPtr+2]
+	add eax, 0xc0000000
+	mov [GDTPtr+2], eax
+
+	lgdt [GDTPtr]
+
+
+
+	;or qword [eax], 0xc0000000
+
+	;Test
+	mov ax, SelectorVedio
+	mov gs, ax
+	mov ah, 0ch
+	mov al, 'V'
+	mov edx, ((80*13) + 40)*2
+	mov [gs:edx], ax
 
 
 
